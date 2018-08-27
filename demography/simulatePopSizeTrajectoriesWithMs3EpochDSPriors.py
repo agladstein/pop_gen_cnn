@@ -1,23 +1,41 @@
-import sys, os, random, math
+import sys, os
 from miscFuncs import *
 
 baseOutDir, filePrefix, numReps = sys.argv[1:]
 numReps = int(numReps)
 
+
 def selectVal(minVal, maxVal):
     size = maxVal-minVal
     return (random.random()*size)+minVal
 
+
+def creatDir(dir):
+    try:
+        os.makedirs(dir)
+    except OSError:
+        if not os.path.isdir(dir):
+            raise
+
+
 msOutDir = "%s/sims" %(baseOutDir)
-logDir = "%s/logs" %(baseOutDir)
 msOutPath = msOutDir+"/"+filePrefix+".msOut"
+
+logDir = "%s/logs" %(baseOutDir)
 logPath = logDir+"/"+filePrefix+".log"
-popSizeHistDir = "%s/popSizeHistories/" %(baseOutDir)
+
+popSizeHistDir = "%s/popSizeHistories" %(baseOutDir)
 popSizeHistPath = popSizeHistDir+"/"+filePrefix+".popSize"
+
 tbsDir = "%s/tbsFiles/" %(baseOutDir)
 tbsPath = tbsDir+"/"+filePrefix+".tbs"
+
+for dir in [msOutDir, logDir, popSizeHistDir, tbsDir]:
+    creatDir(dir)
+
+msPath = "./bin/ms"
+
 L = 1500000
-msPath = "ms"
 sampleSize = 50
 u=1.2e-8/10
 r=1e-8
