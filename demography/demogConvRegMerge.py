@@ -10,7 +10,8 @@ from keras import backend as K
 from sklearn.neighbors import NearestNeighbors
 
 batch_size = 200
-epochs = 10
+#epochs = 10
+epochs = 1
 
 convDim, convSize, poolSize, useLog, useInt, sortRows, useDropout, lossThreshold, inDir, weightFileName, modFileName, testPredFileName = sys.argv[1:]
 convDim = convDim.lower()
@@ -32,26 +33,27 @@ X = []
 y = []
 print("reading data")
 for npzFileName in os.listdir(inDir):
-    u = np.load(inDir + npzFileName)
-    currX, curry = [u[i] for i in  ('X', 'y')]
-    ni,nr,nc = currX.shape
-    newCurrX = []
-    for i in range(ni):
-        currCurrX = [currX[i,0]]
-        if sortRows:
-            currCurrX.extend(resort_min_diff(currX[i,1:]))
-        else:
-            currCurrX.extend(currX[i,1:])
-        currCurrX = np.array(currCurrX)
-        newCurrX.append(currCurrX.T)
-    currX = np.array(newCurrX)
-    assert currX.shape == (ni,nc,nr)
-    #indices = [i for i in range(nc) if i % 10 == 0]
-    #X.extend(np.take(currX,indices,axis=1))
-    X.extend(currX)
-    y.extend(curry)
-    #if len(y) == 10000:
-    #    break
+    if npzFileName.endswith(".npz"):
+        u = np.load(inDir + npzFileName)
+        currX, curry = [u[i] for i in  ('X', 'y')]
+        ni,nr,nc = currX.shape
+        newCurrX = []
+        for i in range(ni):
+            currCurrX = [currX[i,0]]
+            if sortRows:
+                currCurrX.extend(resort_min_diff(currX[i,1:]))
+            else:
+                currCurrX.extend(currX[i,1:])
+            currCurrX = np.array(currCurrX)
+            newCurrX.append(currCurrX.T)
+        currX = np.array(newCurrX)
+        assert currX.shape == (ni,nc,nr)
+        #indices = [i for i in range(nc) if i % 10 == 0]
+        #X.extend(np.take(currX,indices,axis=1))
+        X.extend(currX)
+        y.extend(curry)
+        #if len(y) == 10000:
+        #    break
 
 y = np.array(y)
 numParams=y.shape[1]
@@ -59,8 +61,10 @@ if useLog:
     y[y == 0] = 1e-6#give zeros a very tiny value so they don't break our log scaling
     y = np.log(y)
 totInstances = len(X)
-testSize=10000
-valSize=10000
+#testSize=10000
+#valSize=10000
+testSize=100
+valSize=100
 print("formatting data arrays")
 X = np.array(X)
 posX=X[:,:,0]
