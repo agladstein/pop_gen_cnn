@@ -9,6 +9,7 @@ from keras.layers.pooling import MaxPooling2D, AveragePooling1D
 from keras import backend as K
 from sklearn.neighbors import NearestNeighbors
 
+
 # During training used a batch size of 200
 batch_size = 200
 # Trained our networks for up to 10 iterations
@@ -27,11 +28,12 @@ epochs = 1
 convDim, convSize, poolSize, useLog, useInt, sortRows, useDropout, lossThreshold, inDir, weightFileName, modFileName, testPredFileName = sys.argv[1:]
 convDim = convDim.lower()
 convSize, poolSize = int(convSize), int(poolSize)
-useLog = True if useLog.lower() in ["true","logy"] else False
-useInt = True if useInt.lower() in ["true","intallele"] else False
-sortRows = True if sortRows.lower() in ["true","sortrows"] else False
-useDropout = True if useDropout.lower() in ["true","dropout"] else False
+useLog = True if useLog.lower() in ["true", "logy"] else False
+useInt = True if useInt.lower() in ["true", "intallele"] else False
+sortRows = True if sortRows.lower() in ["true", "sortrows"] else False
+useDropout = True if useDropout.lower() in ["true", "dropout"] else False
 lossThreshold = float(lossThreshold)
+
 
 def resort_min_diff(amat):
     ###assumes your snp matrix is indv. on rows, snps on cols
@@ -40,27 +42,29 @@ def resort_min_diff(amat):
     smallest = np.argmin(v[0].sum(axis=1))
     return amat[v[1][smallest]]
 
+
 X = []
 y = []
 print("reading data")
-# The input is an alignment represented as an image.
-# The input data is an alignment of linked segregating sites with partially shared evolutionary histories.
+# The input data is an alignment of linked segregating sites with partially shared evolutionary histories
+# represented as an image.
 for npzFileName in os.listdir(inDir):
     if npzFileName.endswith(".npz"):
         u = np.load(inDir + npzFileName)
-        currX, curry = [u[i] for i in  ('X', 'y')]
-        ni,nr,nc = currX.shape
+        currX, curry = [u[i] for i in ('X', 'y')]
+        ni, nr, nc = currX.shape
         newCurrX = []
         for i in range(ni):
-            currCurrX = [currX[i,0]]
+            currCurrX = [currX[i, 0]] # gets the site positions
             if sortRows:
-                currCurrX.extend(resort_min_diff(currX[i,1:]))
+                currCurrX.extend(resort_min_diff(currX[i, 1:]))
             else:
-                currCurrX.extend(currX[i,1:])
+                currCurrX.extend(currX[i, 1:])
             currCurrX = np.array(currCurrX)
+            # Transpose so that we can work with a 1D filter with keras
             newCurrX.append(currCurrX.T)
         currX = np.array(newCurrX)
-        assert currX.shape == (ni,nc,nr)
+        assert currX.shape == (ni, nc, nr)
         #indices = [i for i in range(nc) if i % 10 == 0]
         #X.extend(np.take(currX,indices,axis=1))
         X.extend(currX)
@@ -69,19 +73,16 @@ for npzFileName in os.listdir(inDir):
         #    break
 
 y = np.array(y)
-numParams=y.shape[1]
+numParams = y.shape[1]
 if useLog:
     y[y == 0] = 1e-6#give zeros a very tiny value so they don't break our log scaling
     y = np.log(y)
 totInstances = len(X)
-#testSize=10000
-#valSize=10000
-testSize=100
-valSize=100
+
 print("formatting data arrays")
 X = np.array(X)
-posX=X[:,:,0]
-X=X[:,:,1:]
+posX = X[:, :, 0]
+X = X[:, :, 1:]
 # positional information is a vector whose length is the maximum of the number of segregating sites
 # observed across all simulated examples minus one.
 imgRows, imgCols = X.shape[1:]
@@ -94,20 +95,29 @@ if convDim == "2d":
     X = X.reshape(X.shape[0], imgRows, imgCols, 1).astype('float32')
 posX = posX.astype('float32')/127.5-1
 
+testSize = 100
+valSize = 100
+
 assert totInstances > testSize+valSize
 
-testy=y[:testSize]
-valy=y[testSize:testSize+valSize]
-y=y[testSize+valSize:]
-testX=X[:testSize]
-testPosX=posX[:testSize]
-valX=X[testSize:testSize+valSize]
-valPosX=posX[testSize:testSize+valSize]
-X=X[testSize+valSize:]
-posX=posX[testSize+valSize:]
+# test dataset
+testy = y[:testSize]
+testX = X[:testSize]
+testPosX = posX[:testSize]
 
-yMeans=np.mean(y, axis=0)
-yStds=np.std(y, axis=0)
+# validation dataset
+valy = y[testSize:testSize+valSize]
+valX = X[testSize:testSize+valSize]
+valPosX = posX[testSize:testSize+valSize]
+
+# training dataset
+y = y[testSize+valSize:]
+X = X[testSize+valSize:]
+posX = posX[testSize+valSize:]
+
+# Each response variable was transformed to a Z-score
+yMeans = np.mean(y, axis=0)
+yStds = np.std(y, axis=0)
 y = (y-yMeans)/yStds
 testy = (testy-yMeans)/yStds
 valy = (valy-yMeans)/yStds
@@ -133,8 +143,9 @@ else:
     # and stretches entirely across the other dimension (in our case across all chromosomes in the sample).
     inputShape = (imgRows, imgCols)
     convFunc = Conv1D
-    poolFunc = AveragePooling1D
+    poolFunc = AveragePooling1D # Lex said this is better than MaxPooling2D, but that is anecdotal
 
+# branch 1
 # The image is passed through a first convolutional layer in order to create a set of feature maps.
 # First convolutional layer, producing 128 filters
 b1 = Input(shape=inputShape)
@@ -146,6 +157,7 @@ if useDropout:
     # dropout layers immediately follow max pooling steps.
     pool11 = Dropout(0.25)(pool11)
 
+# branch 1
 # Second convolutional layer, producing 128 filters
 # These feature maps are then passed through a second convolutional filter and pooling step.
 conv12 = convFunc(128, kernel_size=2, activation='relu')(pool11)
@@ -157,6 +169,7 @@ if useDropout:
     # dropout step randomly removes 25% of neurons.
     pool12 = Dropout(0.25)(pool12)
 
+# branch 1
 # Third convolutional layer, producing 128 filters
 # These feature maps are then passed through a third convolutional filter and pooling step.
 conv13 = convFunc(128, kernel_size=2, activation='relu')(pool12)
@@ -168,6 +181,7 @@ if useDropout:
     # dropout step randomly removes 25% of neurons.
     pool13 = Dropout(0.25)(pool13)
 
+# branch 1
 # Fourth convolutional layer, producing 128 filters
 conv14 = convFunc(128, kernel_size=2, activation='relu')(pool13)
 # The set of feature maps are downsized via a pooling step.
@@ -180,7 +194,10 @@ if useDropout:
 # The resulting output is flattened in order to be passed as input into a fully connected feedforward layer.
 flat11 = Flatten()(pool14)
 
+# branch 2
 # dense neural network layer (consisting of 32 nodes) taking positional information as its input
+# A dense layer is a fully connected layer.
+# Dense layers implement the following operation: output = activation(dot(input, kernel) + bias)
 b2 = Input(shape=(imgRows,))
 dense21 = Dense(32, activation='relu')(b2)
 if useDropout:
@@ -190,32 +207,35 @@ if useDropout:
 
 # concatenate dense neural network layer output with that of the final max pooling layer of the CNN
 merged = concatenate([flat11, dense21])
-# feed concatenated dense neural net output and max pooling layer into final dense layer (256 nodes).
+# final dense layer (256 nodes).
+# A dense layer is a fully connected layer.
+# Dense layers implement the following operation: output = activation(dot(input, kernel) + bias)
 denseMerged = Dense(256, activation='relu', kernel_initializer='normal')(merged)
 if useDropout:
     # dropout layers immediately follows the final dense layer.
     # dropout step randomly removes 25% of neurons.
     denseMerged = Dropout(0.25)(denseMerged)
-denseOutput = Dense(numParams)(denseMerged)
-model = Model(inputs=[b1, b2], outputs=denseOutput)
+denseOutput = Dense(numParams)(denseMerged) # Sets the size of your output vector from the final dense model
+model = Model(inputs=[b1, b2], outputs=denseOutput) # what does this do?
 print(model.summary())
 
+# compile the model with the adam optimizer and the mean_squared_error loss function.
 model.compile(loss='mean_squared_error', optimizer='adam')
 earlystop = keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=3, verbose=0, mode='auto')
-checkpoint = keras.callbacks.ModelCheckpoint(weightFileName, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+checkpoint = keras.callbacks.ModelCheckpoint(weightFileName, monitor='val_loss', verbose=1, save_best_only=True, mode='min') # look into this
 callbacks = [earlystop, checkpoint]
 
-# During training we used a batch size of 200.
-# Training continues for a number of iterations (called epochs) until a specified stopping criterion is reached,
-# up to 10 iterations, and
-# retained the best performing CNN as assessed on the validation set.
+# Fit the model.
+# Train the model for 10 iterations (epochs) in batches of 200 samples
+# until a specified stopping criterion is reached.
+# Retained the best performing CNN as assessed on the validation set.
 model.fit([X, posX], y, batch_size=batch_size, epochs=epochs, verbose=1, validation_data=([valX, valPosX], valy), callbacks=callbacks)
 
 
 # Evaluted the performance of the best CNN on the test set by calculating total RMSE
 #now we load the weights for the best-performing model
 model.load_weights(weightFileName)
-model.compile(loss='mean_squared_error', optimizer='adam')
+model.compile(loss='mean_squared_error', optimizer='adam') # maybe unnecessary
 
 #now we get the loss for our best model on the test set and emit predictions
 testLoss = model.evaluate([testX, testPosX], testy)
