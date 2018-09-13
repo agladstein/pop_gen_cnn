@@ -72,6 +72,10 @@ for npzFileName in os.listdir(inDir):
         #if len(y) == 10000:
         #    break
 
+if len(X) == 0:
+    print('Exiting, I have no data. Are there .npz files in ' + str(inDir) + '?')
+    sys.exit()
+
 y = np.array(y)
 numParams = y.shape[1]
 if useLog:
